@@ -24,6 +24,7 @@ def dbt_generator():
 @click.option('--model-prefix', type=bool, default=False, help='Prefix model name with source_name + _')
 @click.option('--case-sensitive', type=bool, help='(default=False) treat column names as case-sensitive - otherwise force all to lower', default=False)
 @click.option('--leading-commas', type=bool, help='(default=False)  Whether you want your commas to be leading (vs trailing).', default=False)
+@click.option('--materialized', type=str, default='', help='Set materialization style (e.g. table, view, incremental) inside of the model config block. If not set, materialization style will be controlled by dbt_project.yml')
 def generate(source_yml, output_path, source_index, model, custom_prefix, model_prefix, case_sensitive, leading_commas):
     tables, source_name = get_base_tables_and_source(source_yml, source_index)
     if model:
@@ -35,7 +36,7 @@ def generate(source_yml, output_path, source_index, model, custom_prefix, model_
             if custom_prefix:
                 file_name = custom_prefix + '_' + file_name
         
-        query = generate_base_model(table, source_name, case_sensitive, leading_commas)
+        query = generate_base_model(table, source_name, case_sensitive, leading_commas, materialized)
         file = open(os.path.join(output_path, file_name), 'w', newline='')
         file.write(query)
 
