@@ -35,7 +35,7 @@ def generate(source_yml, output_path, source_index, model, custom_prefix, model_
             if custom_prefix:
                 file_name = custom_prefix + '_' + file_name
         
-        query = generate_base_model(table_name, source_name, case_sensitive, leading_commas)
+        query = generate_base_model(file_name, source_name, case_sensitive, leading_commas)
         file = open(os.path.join(output_path, file_name), 'w', newline='')
         file.write(query)
 
