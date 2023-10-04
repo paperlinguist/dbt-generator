@@ -20,6 +20,10 @@ def generate_base_model(table_name, source_name, case_sensitive, leading_commas,
 	    output = subprocess.check_output(["powershell.exe",bash_command]).decode("utf-8")
 	else:
 		output = subprocess.check_output(bash_command, shell=True).decode("utf-8")
-	sql_index = output.lower().find('with source as')
+
+	if materialized == '':
+		sql_index = output.lower().find('with source as')
+	else:
+		sql_index = output.lower().find('{{ config(materialized=')
 	sql_query = output[sql_index:]
 	return sql_query
