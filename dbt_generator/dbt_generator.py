@@ -25,7 +25,7 @@ def dbt_generator():
 @click.option('--case-sensitive', type=bool, help='(default=False) treat column names as case-sensitive - otherwise force all to lower', default=False)
 @click.option('--leading-commas', type=bool, help='(default=False)  Whether you want your commas to be leading (vs trailing).', default=False)
 @click.option('--materialized', type=str, default='', help='Set materialization style (e.g. table, view, incremental) inside of the model config block. If not set, materialization style will be controlled by dbt_project.yml')
-def generate(source_yml, output_path, source_index, model, custom_prefix, model_prefix, case_sensitive, leading_commas):
+def generate(source_yml, output_path, source_index, model, custom_prefix, model_prefix, case_sensitive, leading_commas, materialized):
     tables, source_name = get_base_tables_and_source(source_yml, source_index)
     if model:
         tables = [model]
