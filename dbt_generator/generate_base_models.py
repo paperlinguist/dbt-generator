@@ -33,7 +33,7 @@ def generate_source_yaml(database_name, schema_name, table_names, generate_colum
     print(f'Generating source yaml for schema {fq_path}')
     # start the bash command
     bash_command = f'''
-        dbt run-operation generate_source  --args \'{{"database_name": "{database_name}", "schema_name": "{schema_name}, "generate_columns": {generate_columns}, "include_descriptions": {include_descriptions}, "table_pattern": {table_pattern}, "name": {name}, "include_database": {include_database}, "include_schema": {include_schema}
+        dbt run-operation generate_source  --args \'{{"database_name": "{database_name}", "schema_name": "{schema_name}", "generate_columns": {generate_columns}, "include_descriptions": {include_descriptions}, "table_pattern": "{table_pattern}", "name": "{name}", "include_database": {include_database}, "include_schema": {include_schema}
     '''
 
     if table_names: # add the table names arg
