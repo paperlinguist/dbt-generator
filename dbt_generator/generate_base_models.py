@@ -27,3 +27,28 @@ def generate_base_model(table_name, source_name, case_sensitive, leading_commas,
         sql_index = output.lower().find('{{ config(materialized=')
     sql_query = output[sql_index:]
     return sql_query
+
+def generate_source_yaml(database_name, schema_name, table_names, generate_columns, include_descriptions, include_data_types, table_pattern, exclude, name, include_database, include_schema):
+    fq_path = database_name + '.' + schema_name
+    print(f'Generating source yaml for schema {fq_path}')
+    # start the bash command
+    bash_command = f'''
+        dbt run-operation generate_source  --args \'{{"database_name": "{database_name}", "schema_name": "{schema_name}, "generate_columns": {generate_columns}, "include_descriptions": {include_descriptions}, "table_pattern": {table_pattern}, "name": {name}, "include_database": {include_database}, "include_schema": {include_schema}
+    '''
+
+    if table_names: # add the table names arg
+        bash_command = bash_command + ', "table_names": {table_names} '
+    if exclude: # add the exclusions
+        bash_command = bash_command + ', "exclude": {exclude} '
+
+    # close the bash command
+    bash_command = bash_command + " }}\'"
+
+    if system() == 'Windows':
+        output = subprocess.check_output(["powershell.exe",bash_command]).decode("utf-8")
+    else:
+        output = subprocess.check_output(bash_command, shell=True).decode("utf-8")
+    
+    sql_index = output.lower().find('version') # Trim any excess output from the beginning "version: 2" should be the first line
+    sql_query = output[sql_index:]
+    return sql_query

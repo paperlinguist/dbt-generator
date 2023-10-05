@@ -13,7 +13,7 @@ def dbt_generator():
     pass
 
 
-@dbt_generator.command(help='Gennerate base models based on a .yml source')
+@dbt_generator.command(help='Generate base models based on a .yml source')
 @click.option('-s', '--source-yml', type=click.Path(), help='Source .yml file to be used')
 @click.option('-o', '--output-path', type=click.Path(), help='Path to write generated models')
 @click.option('-m', '--model', type=str, default='', help='Select one model to generate')
@@ -44,7 +44,7 @@ def generate(source_yml, output_path, source_index, model, custom_prefix, model_
 @click.option('-m', '--model-path', type=click.Path(), help='The path to models')
 @click.option('-t', '--transforms-path', type=click.Path(), help='Path to a .yml file containing transformations')
 @click.option('-o', '--output-path', type=click.Path(), help='Path to write transformed models to')
-@click.option('--drop-metadata', type=bool, help='Toptionally drop source columns prefixed with "_" if that designates metadata columns not needed in target', default=True)
+@click.option('--drop-metadata', type=bool, help='Optionally drop source columns prefixed with "_" if that designates metadata columns not needed in target', default=True)
 @click.option('--case-sensitive', type=bool, help='(default=False) treat column names as case-sensitive - otherwise force all to lower', default=False)
 def transform(model_path, transforms_path, output_path, drop_metadata, case_sensitive):
     sql_files = get_sql_files(model_path)
@@ -98,6 +98,34 @@ def sf_transform(model_path, output_path, drop_metadata, case_sensitive, split_c
             model_path, sql_file), drop_metadata, case_sensitive, split_columns, id_as_int, convert_timestamp)
         processor.process_base_models(os.path.join(output_path, sql_file))
 
+@dbt_generator.command(help='Generate source .yml.')
+@click.option('-o', '--output-path', type=click.Path(), help='Path to write generated .yml')
+@click.option('-c', '--custom_prefix', type=str, default='', help='Enter a Custom String Prefix for Model Filename')
+@click.option('--model-prefix', type=bool, default=False, help='Prefix .yml name with source_name + _')
+@click.option('--schema_name', type=str, default='', help='(required): The schema name that contains your source data')
+@click.option('--database_name', type=str, default='', help='(required): The database that your source data is in.')
+@click.option('--table_names', type=str, default='', help='(optional, default=none): A list of tables that you want to generate the source definitions for (i.e. ["table_1", "table_2"] )')
+@click.option('--generate_columns', type=bool, default=False, help='(optional, default=False): Whether you want to add the column names to your source definition.')
+@click.option('--include_descriptions', type=bool, default=False, help='(optional, default=False): Whether you want to add description placeholders to your source definition.')
+@click.option('--include_data_types', type=bool, default=True, help='(optional, default=True): Whether you want to add data types to your source columns definitions.')
+@click.option('--table_pattern', type=str, default='%', help='(optional, default='%'): A table prefix / postfix that you want to subselect from all available tables within a given schema.')
+@click.option('--exclude', type=str, default='', help='(optional, default=''): A string you want to exclude from the selection criteria')
+@click.option('--name', type=str, default='', help='(optional, default=schema_name): The name of your source')
+@click.option('--include_database', type=bool, default=False, help='(optional, default=False): Whether you want to add the database to your source definition')
+@click.option('--include_schema', type=bool, default=False, help='(optional, default=False): Whether you want to add the schema to your source definition')
+def source_yaml(output_path, custom_prefix, model_prefix, database_name, schema_name, table_names, generate_columns, include_descriptions, include_data_types, table_pattern, exclude, name, include_database, include_schema):
+    if name == '': # default behavior for the function
+        name = schema_name
+    
+    file_name = schema_name + '.yml'
+    if model_prefix:
+        file_name = database_name + '_' + file_name
+    if custom_prefix:
+        file_name = custom_prefix + '_' + file_name
+        
+    query = generate_source_yaml(database_name, schema_name, table_names, generate_columns, include_descriptions, include_data_types, table_pattern, exclude, name, include_database, include_schema)
+    file = open(os.path.join(output_path, file_name), 'w', newline='')
+    file.write(query)
 
 if __name__ == '__main__':
     dbt_generator()
