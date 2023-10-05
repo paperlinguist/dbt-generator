@@ -108,7 +108,7 @@ def sf_transform(model_path, output_path, drop_metadata, case_sensitive, split_c
 @click.option('--generate_columns', type=bool, default=False, help='(optional, default=False): Whether you want to add the column names to your source definition.')
 @click.option('--include_descriptions', type=bool, default=False, help='(optional, default=False): Whether you want to add description placeholders to your source definition.')
 @click.option('--include_data_types', type=bool, default=True, help='(optional, default=True): Whether you want to add data types to your source columns definitions.')
-@click.option('--table_pattern', type=str, default='%', help='(optional, default='%'): A table prefix / postfix that you want to subselect from all available tables within a given schema.')
+@click.option('--table_pattern', type=str, default='%', help='(optional, default="%"): A table prefix / postfix that you want to subselect from all available tables within a given schema.')
 @click.option('--exclude', type=str, default='', help='(optional, default=''): A string you want to exclude from the selection criteria')
 @click.option('--name', type=str, default='', help='(optional, default=schema_name): The name of your source')
 @click.option('--include_database', type=bool, default=False, help='(optional, default=False): Whether you want to add the database to your source definition')
