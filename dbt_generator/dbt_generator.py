@@ -20,7 +20,6 @@ def dbt_generator():
 @click.option('-c', '--custom_prefix', type=str, default='', help='Enter a Custom String Prefix for Model Filename')
 @click.option('--model-prefix', type=bool, default=False, help='Prefix model name with source_name + _')
 @click.option('--source-index', type=int, default=0, help='Index of the source to generate base models for')
-@click.option('--source-index', type=int, default=0, help='Index of the source to generate base models for')
 @click.option('--model-prefix', type=bool, default=False, help='Prefix model name with source_name + _')
 @click.option('--case-sensitive', type=bool, help='(default=False) treat column names as case-sensitive - otherwise force all to lower', default=False)
 @click.option('--leading-commas', type=bool, help='(default=False)  Whether you want your commas to be leading (vs trailing).', default=False)
@@ -33,8 +32,8 @@ def generate(source_yml, output_path, source_index, model, custom_prefix, model_
         file_name = table + '.sql'
         if model_prefix:
             file_name = source_name + '_' + file_name
-            if custom_prefix:
-                file_name = custom_prefix + '_' + file_name
+        if custom_prefix:
+            file_name = custom_prefix + '_' + file_name
         
         query = generate_base_model(table, source_name, case_sensitive, leading_commas, materialized)
         file = open(os.path.join(output_path, file_name), 'w', newline='')
