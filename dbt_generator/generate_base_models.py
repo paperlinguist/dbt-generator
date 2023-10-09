@@ -40,10 +40,10 @@ def get_snapshot_sql(dbt_source, target_schema, table_name, unique_key, snapshot
     query_results = output[sql_index:]
     return query_results
 
-def generate_base_model(table_name, source_name, case_sensitive, leading_commas, materialized):
+def generate_base_model(table_name, source_name, case_sensitive, leading_commas, materialized, use_snapshot):
     print(f'Generating base model for table {table_name}')
     bash_command = f'''
-        dbt run-operation macro_create_base_model --args \'{{"source_name": "{source_name}", "table_name": "{table_name}", "case_sensitive_cols": {case_sensitive}, "leading_commas": {leading_commas}, "materialized": "{materialized}" }}\'
+        dbt run-operation macro_create_base_model --args \'{{"source_name": "{source_name}", "table_name": "{table_name}", "case_sensitive_cols": {case_sensitive}, "leading_commas": {leading_commas}, "materialized": "{materialized}", "use_snapshot": {use_snapshot} }}\'
     '''
     if system() == 'Windows':
         output = subprocess.check_output(["powershell.exe",bash_command]).decode("utf-8")
