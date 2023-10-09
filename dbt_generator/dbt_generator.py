@@ -2,16 +2,16 @@ import os
 import click
 from .generate_base_models import *
 from .process_base_models import *
+import ast
+import pandas as pd
 
 
 def get_file_name(file_path):
     return os.path.basename(file_path)
 
-
 @click.group(help='Generate and process base dbt models')
 def dbt_generator():
     pass
-
 
 @dbt_generator.command(help='Generate base models based on a .yml source')
 @click.option('-s', '--source-yml', type=click.Path(), help='Source .yml file to be used')
@@ -38,7 +38,6 @@ def generate(source_yml, output_path, source_index, model, custom_prefix, model_
         query = generate_base_model(table, source_name, case_sensitive, leading_commas, materialized)
         file = open(os.path.join(output_path, file_name), 'w', newline='')
         file.write(query)
-
 
 @dbt_generator.command(help='Transform base models in a directory using a transforms.yml file')
 @click.option('-m', '--model-path', type=click.Path(), help='The path to models')
@@ -108,7 +107,7 @@ def sf_transform(model_path, output_path, drop_metadata, case_sensitive, split_c
 @click.option('--generate_columns', type=bool, default=False, help='(optional, default=False): Whether you want to add the column names to your source definition.')
 @click.option('--include_descriptions', type=bool, default=False, help='(optional, default=False): Whether you want to add description placeholders to your source definition.')
 @click.option('--include_data_types', type=bool, default=True, help='(optional, default=True): Whether you want to add data types to your source columns definitions.')
-@click.option('--table_pattern', type=str, default='%', help='(optional, default="%"): A table prefix / postfix that you want to subselect from all available tables within a given schema.')
+@click.option('--table_pattern', type=str, default='', help='(optional, default="%"): A table prefix / postfix that you want to subselect from all available tables within a given schema.')
 @click.option('--exclude', type=str, default='', help='(optional, default=''): A string you want to exclude from the selection criteria')
 @click.option('--name', type=str, default='', help='(optional, default=schema_name): The name of your source')
 @click.option('--include_database', type=bool, default=False, help='(optional, default=False): Whether you want to add the database to your source definition')
@@ -126,6 +125,22 @@ def source_yaml(output_path, custom_prefix, model_prefix, database_name, schema_
     query = generate_source_yaml(database_name, schema_name, table_names, generate_columns, include_descriptions, include_data_types, table_pattern, exclude, name, include_database, include_schema)
     file = open(os.path.join(output_path, file_name), 'w', newline='')
     file.write(query)
+
+@dbt_generator.command(help='Generate snapshots based on table. See DBT_SNAPSHOT_SEED.CSV in seeds directory.')
+@click.option('--system_name', type=str, default='', help='(required): The system_name that contains your source data. See dbt_snapshot_seed.csv seed file.')
+@click.option('-o', '--output-path', type=click.Path(), help='(required):Path to write generated snapshot files.')
+@click.option('--target_schema', type=str, default='', help='(required): The name of the schema where you want your snapshots to be created by DBT.')
+def generate_snapshots(system_name, output_path, target_schema):
+    query_results = extract_snapshot_info(system_name)
+    results_dict = ast.literal_eval(query_results) # Need to convert this back to a dict due to how we are retrieving it.
+    results_df = pd.DataFrame.from_dict(results_dict)
+    # iterate over dataframe and generate the actual sql files in the output folder
+    for index, row in results_df.iterrows():
+        contents = get_snapshot_sql(dbt_source=row['DBT_SOURCE'].lower(), target_schema=target_schema.lower(), table_name=row['TABLE_NAME'].lower(), unique_key=row['UNIQUE_KEY'].lower(), snapshot_strategy=row['SNAPSHOT_STRATEGY'].lower(), updated_at=row['UPDATED_AT'], check_cols=row['CHECK_COLS'], invalidate_hard_deletes=row['INVALIDATE_HARD_DELETES'], composite_key=row['COMPOSITE_KEY'])
+        file_name = "snp_" + row['DBT_SOURCE'].lower() + "_" + row['TABLE_NAME'].lower() + ".sql"
+
+        file = open(os.path.join(output_path, file_name), 'w', newline='')
+        file.write(contents)
 
 if __name__ == '__main__':
     dbt_generator()
