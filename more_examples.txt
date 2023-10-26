@@ -1,0 +1,3 @@
+source-yaml -o models\staging\fox -c _src --model-prefix True --schema_name salesforce --database_name pc_fivetran_db --name fox --generate_columns True --include_descriptions True --include_data_types True
+dbt-generator generate-snapshots --system_name SALESFORCE -o snapshots\staging\fox -s models\staging\fox\snapshots
+dbt-generator generate -s models\staging\fox\_src_pc_fivetran_db_salesforce.yml -o models\staging\fox -c stg --model-prefix True --case-sensitive False --leading-commas False --materialized table --use-snapshot True
