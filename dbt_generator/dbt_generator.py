@@ -39,6 +39,7 @@ def generate(source_yml, output_path, source_index, model, custom_prefix, model_
         query = generate_base_model(table, source_name, case_sensitive, leading_commas, materialized, use_snapshot)
         file = open(os.path.join(output_path, file_name), 'w', newline='')
         file.write(query)
+        file.close()
 
 @dbt_generator.command(help='Transform base models in a directory using a transforms.yml file')
 @click.option('-m', '--model-path', type=click.Path(), help='The path to models')
@@ -126,22 +127,53 @@ def source_yaml(output_path, custom_prefix, model_prefix, database_name, schema_
     query = generate_source_yaml(database_name, schema_name, table_names, generate_columns, include_descriptions, include_data_types, table_pattern, exclude, name, include_database, include_schema)
     file = open(os.path.join(output_path, file_name), 'w', newline='')
     file.write(query)
+    file.close()
 
 @dbt_generator.command(help='Generate snapshots based on table. See DBT_SNAPSHOT_SEED.CSV in seeds directory.')
 @click.option('--system_name', type=str, default='', help='(required): The system_name that contains your source data. See dbt_snapshot_seed.csv seed file.')
-@click.option('-o', '--output-path', type=click.Path(), help='(required):Path to write generated snapshot files.')
-@click.option('--target_schema', type=str, default='', help='(required): The name of the schema where you want your snapshots to be created by DBT.')
-def generate_snapshots(system_name, output_path, target_schema):
+@click.option('-o', '--output-path', type=click.Path(), help='(required): Path to write generated snapshot files.')
+@click.option('-s', '--soft-delete-path', type=click.Path(), default='', help='(optional): Path to write generated soft delete snapshot files (has to be in models dir).')
+def generate_snapshots(system_name, output_path, soft_delete_path):
     query_results = extract_snapshot_info(system_name)
     results_dict = ast.literal_eval(query_results) # Need to convert this back to a dict due to how we are retrieving it.
     results_df = pd.DataFrame.from_dict(results_dict)
     # iterate over dataframe and generate the actual sql files in the output folder
     for index, row in results_df.iterrows():
-        contents = get_snapshot_sql(dbt_source=row['DBT_SOURCE'].lower(), target_schema=target_schema.lower(), table_name=row['TABLE_NAME'].lower(), unique_key=row['UNIQUE_KEY'].lower(), snapshot_strategy=row['SNAPSHOT_STRATEGY'].lower(), updated_at=row['UPDATED_AT'], check_cols=row['CHECK_COLS'], invalidate_hard_deletes=row['INVALIDATE_HARD_DELETES'], composite_key=row['COMPOSITE_KEY'])
-        file_name = "snp_" + row['DBT_SOURCE'].lower() + "_" + row['TABLE_NAME'].lower() + ".sql"
+        raw_snapshot_name = "raw_snap_" + row['DBT_SOURCE'].lower() + "_" + row['TABLE_NAME'].lower()
+        raw_file_name = raw_snapshot_name + ".sql"
+        soft_delete_snapshot_name = "snap_" + row['DBT_SOURCE'].lower() + "_" + row['TABLE_NAME'].lower()
+        soft_delete_file_name = soft_delete_snapshot_name + ".sql"
 
-        file = open(os.path.join(output_path, file_name), 'w', newline='')
-        file.write(contents)
+        # check if we need to create a model on top of the existing snapshot for soft deletes
+        if (row['INVALIDATE_FIVETRAN_SOFT_DELETES'] == 1) or (row['INVALIDATE_SOFT_DELETES'] == 1):
+            contents = get_snapshot_sql(snapshot_name=raw_snapshot_name,dbt_source=row['DBT_SOURCE'].lower(), table_name=row['TABLE_NAME'].lower(), \
+                                    unique_key=row['UNIQUE_KEY'].lower(), snapshot_strategy=row['SNAPSHOT_STRATEGY'].lower(), \
+                                    updated_at=row['UPDATED_AT'], check_cols=row['CHECK_COLS'], invalidate_hard_deletes=row['INVALIDATE_HARD_DELETES'], \
+                                    composite_key=row['COMPOSITE_KEY'])
+            # write the raw_snap_ version of the snapshot
+            file = open(os.path.join(output_path, raw_file_name), 'w', newline='')
+            file.write(contents)
+            file.close()
+
+            #call get_soft_delete_snapshot_sql to create the snap_ version
+            soft_delete_contents = get_soft_delete_snapshot_sql(snapshot_name=raw_snapshot_name, invalidate_fivetran_soft_deletes=row['INVALIDATE_FIVETRAN_SOFT_DELETES'], \
+                                    invalidate_soft_deletes=row['INVALIDATE_SOFT_DELETES'], soft_delete_indicator_col=row['SOFT_DELETE_INDICATOR_COL'], \
+                                    soft_delete_date_col=row['SOFT_DELETE_DATE_COL'])
+            if soft_delete_path != '':
+                soft_delete_file = open(os.path.join(soft_delete_path, soft_delete_file_name), 'w', newline='')
+            else:
+                soft_delete_file = open(os.path.join(output_path, soft_delete_file_name), 'w', newline='')
+            soft_delete_file.write(soft_delete_contents)
+            soft_delete_file.close()
+        else:
+            contents = get_snapshot_sql(snapshot_name=soft_delete_snapshot_name, dbt_source=row['DBT_SOURCE'].lower(), table_name=row['TABLE_NAME'].lower(), \
+                                    unique_key=row['UNIQUE_KEY'].lower(), snapshot_strategy=row['SNAPSHOT_STRATEGY'].lower(), \
+                                    updated_at=row['UPDATED_AT'], check_cols=row['CHECK_COLS'], invalidate_hard_deletes=row['INVALIDATE_HARD_DELETES'], \
+                                    composite_key=row['COMPOSITE_KEY'])
+            # just output the regular snap_ version
+            file = open(os.path.join(output_path, soft_delete_file_name), 'w', newline='')
+            file.write(contents)
+            file.close()
 
 if __name__ == '__main__':
     dbt_generator()

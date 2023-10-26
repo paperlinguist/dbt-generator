@@ -1,0 +1,1 @@
+system_name,dbt_source,table_name,unique_key,snapshot_strategy,updated_at,check_cols,invalidate_hard_deletes,composite_key,invalidate_fivetran_soft_deletes,invalidate_soft_deletes,soft_delete_indicator_col,soft_delete_date_col

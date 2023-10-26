@@ -1,0 +1,37 @@
+version: 2
+
+seeds:
+  - name: dbt_snapshot_seed
+    description: "Used for generating snapshots. Add new rows and run dbt-generator scripts to create snapshot files."
+    columns:
+      - name: system_name
+        description: "Name of the source system that the underlying data is coming from (i.e. Salesforce)"
+      - name: dbt_source
+        description: "Name of the dbt source (not the Snowflake database/schema) set up for this data source."
+      - name: table_name
+        description: "Name of the table in the source.yml for this data source."
+      - name: unique_key
+        description: "Unique key for the table. Usually the primary key for the table. Composite keys are possible (i.e. FIELD || '-' || OBJECT )."
+      - name: snapshot_strategy
+        description: "DBT Snapshot strategy (timestamp or check). Timestamp should be preferred."
+      - name: updated_at
+        description: "When snapshot_strategy = timestamp, specify a column that indicates when the row was last updated."
+      - name: check_cols
+        description: 'When snapshot_strategy = check, specify a list of columns ( i.e. ["name", "email"] ) or ALL to check all columns.'
+      - name: invalidate_hard_deletes
+        description: "Boolean 1 or 0. Rows that are deleted from the source query are not invalidated by default. DBT can track rows that no longer exist and invalidate them."
+      - name: composite_key
+        description: "Boolean 1 or 0. Unique Key is a composite of multiple columns. Special handling is needed in the code used to generate the snapshot."
+      - name: invalidate_fivetran_soft_deletes
+        description: "Should we invalidate rows flagged as deleted in Fivetran."
+      - name: invalidate_soft_deletes
+        description: "Should we invalidate soft deletes based on a column."
+      - name: soft_delete_indicator_col
+        description: "Boolean column that indicates if the row is deleted."
+      - name: soft_delete_date_col
+        description: "Timestamp column that indicates the date the row is deleted."
+  - name: sql_reserved_words
+    description: "Used for dbt code generation activities to reduce bad outputs."
+    columns:
+      - name: reserved_word
+        description: "Reserved word list from wiki article. It's probably overkill: https://en.wikipedia.org/wiki/List_of_SQL_reserved_words"

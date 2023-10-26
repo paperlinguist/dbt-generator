@@ -25,10 +25,10 @@ def extract_snapshot_info(source_system):
     query_results = output[sql_index:]
     return query_results
 
-def get_snapshot_sql(dbt_source, target_schema, table_name, unique_key, snapshot_strategy="timestamp", updated_at="None", check_cols="None", invalidate_hard_deletes=0, composite_key=0):
+def get_snapshot_sql(snapshot_name, dbt_source, table_name, unique_key, snapshot_strategy="timestamp", updated_at="None", check_cols="None", invalidate_hard_deletes=0, composite_key=0):
     print(f'Getting snapshot code for {dbt_source}.{table_name} using snapshot strategy {snapshot_strategy}.')
     bash_command = f'''
-        dbt run-operation macro_create_snapshot --args \'{{"dbt_source": "{dbt_source}", "target_schema": "{target_schema}", "table_name": "{table_name}", "unique_key": "{unique_key}", "snapshot_strategy": "{snapshot_strategy}", "updated_at": "{updated_at}", "check_cols": "{check_cols}", "invalidate_hard_deletes": {invalidate_hard_deletes}, "composite_key": {composite_key} }}\'
+        dbt run-operation macro_create_snapshot --args \'{{"snapshot_name": "{snapshot_name}", "dbt_source": "{dbt_source}", "table_name": "{table_name}", "unique_key": "{unique_key}", "snapshot_strategy": "{snapshot_strategy}", "updated_at": "{updated_at}", "check_cols": "{check_cols}", "invalidate_hard_deletes": {invalidate_hard_deletes}, "composite_key": {composite_key} }}\'
     '''
     
     if system() == 'Windows':
@@ -37,6 +37,21 @@ def get_snapshot_sql(dbt_source, target_schema, table_name, unique_key, snapshot
         output = subprocess.check_output(bash_command, shell=True).decode("utf-8")
     
     sql_index = output.lower().find("{% snapshot")
+    query_results = output[sql_index:]
+    return query_results
+
+def get_soft_delete_snapshot_sql(snapshot_name, invalidate_fivetran_soft_deletes, invalidate_soft_deletes, soft_delete_indicator_col, soft_delete_date_col):
+    print(f'Getting soft-delete snapshot code for snapshot {snapshot_name}.')
+    bash_command = f'''
+        dbt run-operation macro_create_soft_delete_snapshot --args \'{{"snapshot_name": "{snapshot_name}", "invalidate_fivetran_soft_deletes": {invalidate_fivetran_soft_deletes}, "invalidate_soft_deletes": {invalidate_soft_deletes}, "soft_delete_indicator_col": "{soft_delete_indicator_col}", "soft_delete_date_col": "{soft_delete_date_col}" }}\'
+    '''
+
+    if system() == 'Windows':
+        output = subprocess.check_output(["powershell.exe",bash_command]).decode("utf-8")
+    else:
+        output = subprocess.check_output(bash_command, shell=True).decode("utf-8")
+
+    sql_index = output.lower().find("select")
     query_results = output[sql_index:]
     return query_results
 
