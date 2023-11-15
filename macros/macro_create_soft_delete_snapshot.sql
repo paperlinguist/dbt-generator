@@ -2,8 +2,11 @@
     {%- if (invalidate_fivetran_soft_deletes == 1) and (invalidate_soft_deletes == 1) -%}
         {%- set valid_to -%}
         case
-            when source.{{soft_delete_indicator_col}} = True then source.{{soft_delete_date_col}}
-            when source.dbt_valid_to <> null then source.dbt_valid_to
+            when source.{{soft_delete_indicator_col}} = True and source.{{soft_delete_date_col}} is not null
+                then source.{{soft_delete_date_col}}
+            when source.{{soft_delete_indicator_col}} = True and source.{{soft_delete_date_col}} is null
+                then source._fivetran_synced
+            when source.dbt_valid_to is not null then source.dbt_valid_to
             when source._fivetran_deleted = True then source._fivetran_synced
             else null
         end as dbt_valid_to
@@ -11,7 +14,7 @@
     {%- elif invalidate_fivetran_soft_deletes == 1 -%}
         {%- set valid_to -%}
         case
-            when source.dbt_valid_to <> null
+            when source.dbt_valid_to is not null
             then source.dbt_valid_to
             when source._fivetran_deleted = true
             then source._fivetran_synced
@@ -21,9 +24,11 @@
     {%- elif invalidate_soft_deletes == 1 -%}
         {%- set valid_to -%}
         case
-            when source.{{ soft_delete_indicator_col }} = true
-            then source.{{ soft_delete_date_col }}
-            when source.dbt_valid_to <> null
+            when source.{{soft_delete_indicator_col}} = True and source.{{soft_delete_date_col}} is not null
+                then source.{{soft_delete_date_col}}
+            when source.{{soft_delete_indicator_col}} = True and source.{{soft_delete_date_col}} is null
+                then source._fivetran_synced
+            when source.dbt_valid_to is not null
             then source.dbt_valid_to
             else null
         end as dbt_valid_to

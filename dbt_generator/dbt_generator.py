@@ -131,49 +131,117 @@ def source_yaml(output_path, custom_prefix, model_prefix, database_name, schema_
 
 @dbt_generator.command(help='Generate snapshots based on table. See DBT_SNAPSHOT_SEED.CSV in seeds directory.')
 @click.option('--system_name', type=str, default='', help='(required): The system_name that contains your source data. See dbt_snapshot_seed.csv seed file.')
-@click.option('-o', '--output-path', type=click.Path(), help='(required): Path to write generated snapshot files.')
-@click.option('-s', '--soft-delete-path', type=click.Path(), default='', help='(optional): Path to write generated soft delete snapshot files (has to be in models dir).')
-def generate_snapshots(system_name, output_path, soft_delete_path):
-    query_results = extract_snapshot_info(system_name)
+@click.option('-s', '--snapshot-path', type=click.Path(), help='(required): Path to write generated snapshot files.')
+@click.option('-m', '--model-path', type=click.Path(), default='', help='(optional): Path to write generated other models (soft delete snapshots, formula views, etc.).')
+def generate_snapshots(system_name, snapshot_path, model_path):
+    query_results = extract_snapshot_info(system_name) # retrieve the snapshot info for the system we are interested in.
     results_dict = ast.literal_eval(query_results) # Need to convert this back to a dict due to how we are retrieving it.
-    results_df = pd.DataFrame.from_dict(results_dict)
+    snapshot_list = pd.DataFrame.from_dict(results_dict) # Create snapshot info dataframe
+    
     # iterate over dataframe and generate the actual sql files in the output folder
-    for index, row in results_df.iterrows():
-        raw_snapshot_name = "raw_snap_" + row['DBT_SOURCE'].lower() + "_" + row['TABLE_NAME'].lower()
-        raw_file_name = raw_snapshot_name + ".sql"
-        soft_delete_snapshot_name = "snap_" + row['DBT_SOURCE'].lower() + "_" + row['TABLE_NAME'].lower()
-        soft_delete_file_name = soft_delete_snapshot_name + ".sql"
+    for index, row in snapshot_list.iterrows():
+        dbt_source = row['DBT_SOURCE'].lower()
+        table_name = row['TABLE_NAME'].lower()
+        unique_key = row['UNIQUE_KEY'].lower()
+        snapshot_strategy = row['SNAPSHOT_STRATEGY'].lower()
+        updated_at = row['UPDATED_AT']
+        check_cols = row['CHECK_COLS']
+        invalidate_hard_deletes = row['INVALIDATE_HARD_DELETES']
+        invalidate_fivetran_soft_deletes = row['INVALIDATE_FIVETRAN_SOFT_DELETES']
+        composite_key = row['COMPOSITE_KEY']
+        invalidate_soft_deletes = row['INVALIDATE_SOFT_DELETES']
+        soft_delete_indicator_col = row['SOFT_DELETE_INDICATOR_COL']
+        soft_delete_date_col = row['SOFT_DELETE_DATE_COL']
+        source_table_name = dbt_source + "_" + table_name
 
-        # check if we need to create a model on top of the existing snapshot for soft deletes
-        if (row['INVALIDATE_FIVETRAN_SOFT_DELETES'] == 1) or (row['INVALIDATE_SOFT_DELETES'] == 1):
-            contents = get_snapshot_sql(snapshot_name=raw_snapshot_name,dbt_source=row['DBT_SOURCE'].lower(), table_name=row['TABLE_NAME'].lower(), \
-                                    unique_key=row['UNIQUE_KEY'].lower(), snapshot_strategy=row['SNAPSHOT_STRATEGY'].lower(), \
-                                    updated_at=row['UPDATED_AT'], check_cols=row['CHECK_COLS'], invalidate_hard_deletes=row['INVALIDATE_HARD_DELETES'], \
-                                    composite_key=row['COMPOSITE_KEY'])
-            # write the raw_snap_ version of the snapshot
-            file = open(os.path.join(output_path, raw_file_name), 'w', newline='')
-            file.write(contents)
-            file.close()
-
-            #call get_soft_delete_snapshot_sql to create the snap_ version
-            soft_delete_contents = get_soft_delete_snapshot_sql(snapshot_name=raw_snapshot_name, invalidate_fivetran_soft_deletes=row['INVALIDATE_FIVETRAN_SOFT_DELETES'], \
-                                    invalidate_soft_deletes=row['INVALIDATE_SOFT_DELETES'], soft_delete_indicator_col=row['SOFT_DELETE_INDICATOR_COL'], \
-                                    soft_delete_date_col=row['SOFT_DELETE_DATE_COL'])
-            if soft_delete_path != '':
-                soft_delete_file = open(os.path.join(soft_delete_path, soft_delete_file_name), 'w', newline='')
-            else:
-                soft_delete_file = open(os.path.join(output_path, soft_delete_file_name), 'w', newline='')
-            soft_delete_file.write(soft_delete_contents)
-            soft_delete_file.close()
+        # if formula views AND soft deletes needed
+        if (row['SALESFORCE_FORMULA_TRANSFORMATION'] == 1) and ((row['INVALIDATE_FIVETRAN_SOFT_DELETES'] == 1) or (row['INVALIDATE_SOFT_DELETES'] == 1)):
+            # Build formula view
+            file_prefix = 'frm_'
+            file_suffix = '_vw'
+            file_name = file_prefix + source_table_name + file_suffix + ".sql"
+            output_path = model_path
+            if not os.path.exists(output_path):
+                os.makedirs(output_path)
+            build_formula_view(dbt_source, table_name, file_name, output_path)
+            # Build formula snapshot (pass formula ref in dbt_source_)
+            use_formula_flag = 1
+            file_prefix = 'snap_frm_'
+            file_name = file_prefix + source_table_name + ".sql"
+            output_path = snapshot_path
+            if not os.path.exists(output_path):
+                os.makedirs(output_path)
+            dbt_source_ = 'frm_' + source_table_name + file_suffix
+            snapshot_name = file_prefix + source_table_name
+            build_snapshot(output_path, file_name, snapshot_name, dbt_source_, table_name, unique_key, snapshot_strategy, updated_at, check_cols, invalidate_hard_deletes, composite_key, use_formula_flag)
+            # Build raw snapshot
+            use_formula_flag = 0
+            file_prefix = 'snap_raw_'
+            file_name = file_prefix + source_table_name + ".sql"
+            output_path = snapshot_path
+            if not os.path.exists(output_path):
+                os.makedirs(output_path)
+            snapshot_name = file_prefix + source_table_name
+            build_snapshot(output_path, file_name, snapshot_name, dbt_source, table_name, unique_key, snapshot_strategy, updated_at, check_cols, invalidate_hard_deletes, composite_key, use_formula_flag)
+            # Build soft delete view (with final name)
+            file_prefix = 'snap_'
+            file_suffix = '_vw'
+            file_name = file_prefix + source_table_name + file_suffix + ".sql"
+            output_path = model_path
+            if not os.path.exists(output_path):
+                os.makedirs(output_path)
+            snapshot_name = 'snap_frm_' + source_table_name
+            build_soft_delete_view(output_path, file_name, snapshot_name, invalidate_fivetran_soft_deletes, invalidate_soft_deletes, soft_delete_indicator_col, soft_delete_date_col)
+        # if formula views needed
+        elif row['SALESFORCE_FORMULA_TRANSFORMATION'] == 1:
+            # Build formula view
+            file_prefix = 'frm_'
+            file_suffix = '_vw'
+            file_name = file_prefix + source_table_name + file_suffix + ".sql"
+            output_path = model_path
+            if not os.path.exists(output_path):
+                os.makedirs(output_path)
+            build_formula_view(dbt_source, table_name, file_name, output_path)
+            # Build formula snapshot (with final name)
+            use_formula_flag = 1
+            file_prefix = 'snap_'
+            file_name = file_prefix + source_table_name + ".sql"
+            output_path = snapshot_path
+            if not os.path.exists(output_path):
+                os.makedirs(output_path)
+            dbt_source_ = file_prefix + source_table_name + file_suffix
+            snapshot_name = file_prefix + source_table_name
+            build_snapshot(output_path, file_name, snapshot_name, dbt_source_, table_name, unique_key, snapshot_strategy, updated_at, check_cols, invalidate_hard_deletes, composite_key, use_formula_flag)
+        # if soft delete views needed
+        elif (row['INVALIDATE_FIVETRAN_SOFT_DELETES'] == 1) or (row['INVALIDATE_SOFT_DELETES'] == 1):
+            # Build raw snapshot
+            use_formula_flag = 0
+            file_prefix = 'snap_raw_'
+            file_name = file_prefix + source_table_name + ".sql"
+            output_path = snapshot_path
+            if not os.path.exists(output_path):
+                os.makedirs(output_path)
+            snapshot_name = file_prefix + source_table_name
+            build_snapshot(output_path, file_name, snapshot_name, dbt_source, table_name, unique_key, snapshot_strategy, updated_at, check_cols, invalidate_hard_deletes, composite_key, use_formula_flag)
+            # Build soft delete view (with final name)
+            file_prefix = 'snap_'
+            file_suffix = '_vw'
+            file_name = file_prefix + source_table_name + file_suffix + ".sql"
+            output_path = model_path
+            if not os.path.exists(output_path):
+                os.makedirs(output_path)
+            snapshot_name = 'snap_frm_' + source_table_name
+            build_soft_delete_view(output_path, file_name, snapshot_name, invalidate_fivetran_soft_deletes, invalidate_soft_deletes, soft_delete_indicator_col, soft_delete_date_col)
         else:
-            contents = get_snapshot_sql(snapshot_name=soft_delete_snapshot_name, dbt_source=row['DBT_SOURCE'].lower(), table_name=row['TABLE_NAME'].lower(), \
-                                    unique_key=row['UNIQUE_KEY'].lower(), snapshot_strategy=row['SNAPSHOT_STRATEGY'].lower(), \
-                                    updated_at=row['UPDATED_AT'], check_cols=row['CHECK_COLS'], invalidate_hard_deletes=row['INVALIDATE_HARD_DELETES'], \
-                                    composite_key=row['COMPOSITE_KEY'])
-            # just output the regular snap_ version
-            file = open(os.path.join(output_path, soft_delete_file_name), 'w', newline='')
-            file.write(contents)
-            file.close()
+            # regular snapshot (with final name)
+            use_formula_flag = 0
+            file_prefix = 'snap_'
+            file_name = file_prefix + source_table_name + ".sql"
+            output_path = snapshot_path
+            if not os.path.exists(output_path):
+                os.makedirs(output_path)
+            snapshot_name = file_prefix + source_table_name
+            build_snapshot(output_path, file_name, snapshot_name, dbt_source, table_name, unique_key, snapshot_strategy, updated_at, check_cols, invalidate_hard_deletes, composite_key, use_formula_flag)
 
 if __name__ == '__main__':
     dbt_generator()

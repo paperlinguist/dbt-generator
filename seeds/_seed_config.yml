@@ -30,6 +30,8 @@ seeds:
         description: "Boolean column that indicates if the row is deleted."
       - name: soft_delete_date_col
         description: "Timestamp column that indicates the date the row is deleted."
+      - name: salesforce_formula_transformation
+        description: "Boolean column that indicates if the table need special salesforce formula transformations. Will create a _formula view of the object and create an extra snapshot."
   - name: sql_reserved_words
     description: "Used for dbt code generation activities to reduce bad outputs."
     columns:
